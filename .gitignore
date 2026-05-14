@@ -1,0 +1,96 @@
+# =========================
+# Python
+# =========================
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+pip-wheel-metadata/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+
+# =========================
+# Jupyter Notebook
+# =========================
+
+.ipynb_checkpoints/
+
+
+# =========================
+# IDEs and editors
+# =========================
+
+.vscode/
+.idea/
+*.swp
+*.swo
+
+
+# =========================
+# Operating system files
+# =========================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+
+# =========================
+# Dataset files
+# =========================
+
+MoNuSeg/
+data/
+datasets/
+
+
+# =========================
+# Model checkpoints and training outputs
+# =========================
+
+checkpoints/
+models/
+runs/
+outputs/
+results/
+wandb/
+lightning_logs/
+
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+
+# =========================
+# Generated reports and temporary exports
+# =========================
+
+*.aux
+*.log
+*.out
+*.toc
+*.bbl
+*.blg
+*.synctex.gz
+
+
+# =========================
+# Large media files
+# =========================
+
+*.mp4
+*.avi
+*.mov
+*.zip
+*.rar
+*.7z
