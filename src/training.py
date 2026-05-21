@@ -23,6 +23,59 @@ def create_patch_labels(
     return torch.zeros_like(prediction)
 
 
+def _as_prediction_list(prediction) -> list[torch.Tensor]:
+    """
+    Normalize a discriminator output to a list of patch prediction tensors.
+
+    A single-scale PatchGAN returns a tensor; a MultiScalePatchGANDiscriminator
+    returns a list of tensors. Wrapping the single-scale case in a one-element
+    list lets the rest of the training code treat both uniformly.
+    """
+    if isinstance(prediction, (list, tuple)):
+        return list(prediction)
+    return [prediction]
+
+
+def compute_adversarial_loss(
+    prediction,
+    target_is_real: bool,
+    criterion: nn.Module,
+) -> torch.Tensor:
+    """
+    Compute the adversarial loss for a discriminator output that may come from
+    either a single-scale or a multi-scale discriminator.
+
+    For multi-scale discriminators, the loss at each scale is computed
+    independently and then averaged across scales. Averaging (rather than
+    summing) keeps the loss magnitude comparable to the single-scale case, so
+    the same lambda_l1 weighting works without retuning.
+    """
+    predictions = _as_prediction_list(prediction)
+    losses = []
+    for pred in predictions:
+        targets = create_patch_labels(pred, target_is_real=target_is_real)
+        losses.append(criterion(pred, targets))
+    return torch.stack(losses).mean()
+
+
+def build_adversarial_criterion(loss_type: str) -> nn.Module:
+    """
+    Build the adversarial criterion for Pix2Pix training.
+
+    Supported values:
+    - "bce": original Pix2Pix formulation with BCEWithLogitsLoss. Treats the
+      adversarial game as binary classification of patches.
+    - "lsgan": Least Squares GAN formulation (Mao et al., 2017) with MSELoss.
+      Penalizes how far the discriminator output is from the target label,
+      which gives smoother gradients and tends to be more stable than BCE.
+    """
+    if loss_type == "bce":
+        return nn.BCEWithLogitsLoss()
+    if loss_type == "lsgan":
+        return nn.MSELoss()
+    raise ValueError(f"Unknown adversarial loss type: {loss_type!r}. Expected 'bce' or 'lsgan'.")
+
+
 def train_pix2pix_one_epoch(
     generator: nn.Module,
     discriminator: nn.Module,
@@ -57,23 +110,27 @@ def train_pix2pix_one_epoch(
         label_maps = batch["label"].to(device)
         real_images = batch["real"].to(device)
 
+        # Single generator forward pass per batch, reused for both D and G
+        # updates. For the D step we detach to avoid gradients flowing back
+        # into the generator; for the G step we re-run the discriminator on
+        # the same fake_images (now without detach).
+        fake_images = generator(label_maps)
+
         # -------------------------
         # Train discriminator
         # -------------------------
 
         optimizer_d.zero_grad(set_to_none=True)
 
-        with torch.no_grad():
-            fake_images = generator(label_maps)
-
         real_prediction = discriminator(label_maps, real_images)
         fake_prediction = discriminator(label_maps, fake_images.detach())
 
-        real_targets = create_patch_labels(real_prediction, target_is_real=True)
-        fake_targets = create_patch_labels(fake_prediction, target_is_real=False)
-
-        d_real_loss = adversarial_criterion(real_prediction, real_targets)
-        d_fake_loss = adversarial_criterion(fake_prediction, fake_targets)
+        d_real_loss = compute_adversarial_loss(
+            real_prediction, target_is_real=True, criterion=adversarial_criterion
+        )
+        d_fake_loss = compute_adversarial_loss(
+            fake_prediction, target_is_real=False, criterion=adversarial_criterion
+        )
         d_loss = 0.5 * (d_real_loss + d_fake_loss)
 
         d_loss.backward()
@@ -85,12 +142,11 @@ def train_pix2pix_one_epoch(
 
         optimizer_g.zero_grad(set_to_none=True)
 
-        fake_images = generator(label_maps)
         fake_prediction = discriminator(label_maps, fake_images)
 
-        real_targets_for_generator = create_patch_labels(fake_prediction, target_is_real=True)
-
-        g_adv_loss = adversarial_criterion(fake_prediction, real_targets_for_generator)
+        g_adv_loss = compute_adversarial_loss(
+            fake_prediction, target_is_real=True, criterion=adversarial_criterion
+        )
         g_l1_loss = reconstruction_criterion(fake_images, real_images)
         g_loss = g_adv_loss + lambda_l1 * g_l1_loss
 
@@ -129,14 +185,21 @@ def validate_pix2pix(
     device: torch.device,
 ) -> dict:
     """
-    Validate the generator using reconstruction loss.
+    Validate the generator using reconstruction loss and image quality metrics.
 
     During validation, we only evaluate the generator because the final goal is
     image generation from label maps.
+
+    Reported metrics:
+    - L1 loss (in normalized [-1, 1] space).
+    - PSNR (in dB, computed in the [0, 1] image space).
+    - SSIM (computed in the [0, 1] image space).
     """
     generator.eval()
 
     running_l1_loss = 0.0
+    running_psnr = 0.0
+    running_ssim = 0.0
     num_batches = len(dataloader)
 
     for batch in dataloader:
@@ -146,11 +209,85 @@ def validate_pix2pix(
         fake_images = generator(label_maps)
         l1_loss = reconstruction_criterion(fake_images, real_images)
 
+        # PSNR and SSIM are computed in the [0, 1] image space, which is the
+        # standard convention. The model outputs and targets live in [-1, 1],
+        # so we denormalize first.
+        fake_01 = torch.clamp((fake_images * 0.5) + 0.5, 0.0, 1.0)
+        real_01 = torch.clamp((real_images * 0.5) + 0.5, 0.0, 1.0)
+
         running_l1_loss += l1_loss.item()
+        running_psnr += compute_psnr(fake_01, real_01).item()
+        running_ssim += compute_ssim(fake_01, real_01).item()
 
     return {
         "val_l1_loss": running_l1_loss / num_batches,
+        "val_psnr": running_psnr / num_batches,
+        "val_ssim": running_ssim / num_batches,
     }
+
+
+def compute_psnr(prediction: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    """
+    Compute the Peak Signal-to-Noise Ratio between two image batches.
+
+    Both tensors are expected to be in the [0, 1] range and to have shape
+    (N, C, H, W). The PSNR is averaged across the batch.
+    """
+    mse = torch.mean((prediction - target) ** 2, dim=[1, 2, 3])
+    # Guard against perfect reconstruction to avoid log(0).
+    mse = torch.clamp(mse, min=1e-10)
+    psnr_per_image = 10.0 * torch.log10(1.0 / mse)
+    return psnr_per_image.mean()
+
+
+def compute_ssim(
+    prediction: torch.Tensor,
+    target: torch.Tensor,
+    window_size: int = 11,
+    sigma: float = 1.5,
+) -> torch.Tensor:
+    """
+    Compute the Structural Similarity Index between two image batches.
+
+    Both tensors are expected to be in the [0, 1] range and to have shape
+    (N, C, H, W). The SSIM is averaged across batch and channels.
+    """
+    import torch.nn.functional as F
+
+    device = prediction.device
+    dtype = prediction.dtype
+    num_channels = prediction.shape[1]
+
+    # Build a 2D Gaussian kernel and replicate it per channel for depthwise conv
+    coords = torch.arange(window_size, dtype=dtype, device=device) - window_size // 2
+    gaussian_1d = torch.exp(-(coords ** 2) / (2.0 * sigma ** 2))
+    gaussian_1d = gaussian_1d / gaussian_1d.sum()
+    gaussian_2d = gaussian_1d[:, None] * gaussian_1d[None, :]
+    window = gaussian_2d.expand(num_channels, 1, window_size, window_size).contiguous()
+
+    padding = window_size // 2
+
+    mu_pred = F.conv2d(prediction, window, padding=padding, groups=num_channels)
+    mu_target = F.conv2d(target, window, padding=padding, groups=num_channels)
+
+    mu_pred_sq = mu_pred * mu_pred
+    mu_target_sq = mu_target * mu_target
+    mu_pred_target = mu_pred * mu_target
+
+    sigma_pred_sq = F.conv2d(prediction * prediction, window, padding=padding, groups=num_channels) - mu_pred_sq
+    sigma_target_sq = F.conv2d(target * target, window, padding=padding, groups=num_channels) - mu_target_sq
+    sigma_pred_target = F.conv2d(prediction * target, window, padding=padding, groups=num_channels) - mu_pred_target
+
+    c1 = 0.01 ** 2
+    c2 = 0.03 ** 2
+
+    ssim_map = (
+        (2.0 * mu_pred_target + c1) * (2.0 * sigma_pred_target + c2)
+    ) / (
+        (mu_pred_sq + mu_target_sq + c1) * (sigma_pred_sq + sigma_target_sq + c2)
+    )
+
+    return ssim_map.mean()
 
 
 def save_checkpoint(
@@ -195,3 +332,33 @@ def load_generator_weights(
     generator.eval()
 
     return generator
+
+
+@torch.no_grad()
+def evaluate_on_test_set(
+    generator: nn.Module,
+    test_loader: DataLoader,
+    device: torch.device,
+) -> dict:
+    """
+    Evaluate the generator on the held-out test set.
+
+    Reports the same set of metrics as the validation function: L1 (in
+    normalized space), PSNR (dB) and SSIM. This is the function that produces
+    the numbers reported in the final results table of the report.
+    """
+    reconstruction_criterion = nn.L1Loss()
+
+    metrics = validate_pix2pix(
+        generator=generator,
+        dataloader=test_loader,
+        reconstruction_criterion=reconstruction_criterion,
+        device=device,
+    )
+
+    # Rename keys so they make sense when printed alongside validation metrics
+    return {
+        "test_l1_loss": metrics["val_l1_loss"],
+        "test_psnr": metrics["val_psnr"],
+        "test_ssim": metrics["val_ssim"],
+    }

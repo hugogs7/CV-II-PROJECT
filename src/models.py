@@ -183,3 +183,66 @@ class PatchGANDiscriminator(nn.Module):
     def forward(self, label_map: torch.Tensor, image: torch.Tensor) -> torch.Tensor:
         x = torch.cat([label_map, image], dim=1)
         return self.model(x)
+
+
+class MultiScalePatchGANDiscriminator(nn.Module):
+    """
+    Multi-scale PatchGAN discriminator for the improved Pix2Pix model.
+
+    Two independent PatchGAN discriminators evaluate the conditional pair at
+    different spatial resolutions:
+    - D1 operates at the original image size (256 x 256), capturing fine local
+      texture realism.
+    - D2 operates on a downsampled version (128 x 128 via average pooling),
+      capturing larger structural patterns and global appearance.
+
+    Combining discriminators at multiple scales encourages the generator to
+    produce outputs that are realistic both at the fine-grained pixel-texture
+    level and at coarser structural levels. This is particularly useful in
+    histology, where realism depends on both nuclei textures and tissue-wide
+    color/contrast distributions.
+
+    The forward method returns a list of patch prediction tensors, one per
+    scale, so the training loop can sum (or average) the adversarial losses
+    across scales.
+    """
+
+    def __init__(
+        self,
+        in_channels: int = 3,
+        base_channels: int = 64,
+        num_scales: int = 2,
+    ):
+        super().__init__()
+
+        self.num_scales = num_scales
+        self.discriminators = nn.ModuleList(
+            [
+                PatchGANDiscriminator(
+                    in_channels=in_channels,
+                    base_channels=base_channels,
+                )
+                for _ in range(num_scales)
+            ]
+        )
+
+        # AvgPool with kernel=3, stride=2, padding=1 is the standard downsampler
+        # used in pix2pixHD for the multi-scale discriminator. It is mild enough
+        # to preserve structure while reducing the resolution by a factor of 2.
+        self.downsample = nn.AvgPool2d(kernel_size=3, stride=2, padding=1, count_include_pad=False)
+
+    def forward(self, label_map: torch.Tensor, image: torch.Tensor) -> list[torch.Tensor]:
+        predictions = []
+
+        current_label = label_map
+        current_image = image
+
+        for index, discriminator in enumerate(self.discriminators):
+            predictions.append(discriminator(current_label, current_image))
+
+            # Downsample for the next (coarser) scale, except after the last D
+            if index < self.num_scales - 1:
+                current_label = self.downsample(current_label)
+                current_image = self.downsample(current_image)
+
+        return predictions

@@ -221,7 +221,8 @@ def show_generated_batch(
 
 def plot_training_history(history: list[dict]) -> None:
     """
-    Plot the main training and validation losses.
+    Plot the main training and validation losses, plus validation metrics
+    (PSNR and SSIM) when they are available in the history.
     """
     epochs = [item["epoch"] for item in history]
 
@@ -229,13 +230,43 @@ def plot_training_history(history: list[dict]) -> None:
     discriminator_loss = [item["discriminator_loss"] for item in history]
     val_l1_loss = [item["val_l1_loss"] for item in history]
 
-    plt.figure(figsize=(8, 5))
-    plt.plot(epochs, generator_loss, marker="o", label="Generator loss")
-    plt.plot(epochs, discriminator_loss, marker="o", label="Discriminator loss")
-    plt.plot(epochs, val_l1_loss, marker="o", label="Validation L1 loss")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.title("Baseline Pix2Pix smoke-test training history")
-    plt.legend()
-    plt.grid(True)
+    has_psnr = all("val_psnr" in item for item in history)
+    has_ssim = all("val_ssim" in item for item in history)
+
+    num_plots = 1 + int(has_psnr) + int(has_ssim)
+    fig, axes = plt.subplots(1, num_plots, figsize=(6 * num_plots, 5))
+
+    if num_plots == 1:
+        axes = [axes]
+
+    # Losses
+    axes[0].plot(epochs, generator_loss, marker="o", label="Generator loss")
+    axes[0].plot(epochs, discriminator_loss, marker="o", label="Discriminator loss")
+    axes[0].plot(epochs, val_l1_loss, marker="o", label="Validation L1 loss")
+    axes[0].set_xlabel("Epoch")
+    axes[0].set_ylabel("Loss")
+    axes[0].set_title("Training and validation losses")
+    axes[0].legend()
+    axes[0].grid(True)
+
+    next_idx = 1
+
+    if has_psnr:
+        val_psnr = [item["val_psnr"] for item in history]
+        axes[next_idx].plot(epochs, val_psnr, marker="o", color="tab:green", label="Validation PSNR")
+        axes[next_idx].set_xlabel("Epoch")
+        axes[next_idx].set_ylabel("PSNR (dB)")
+        axes[next_idx].set_title("Validation PSNR")
+        axes[next_idx].grid(True)
+        next_idx += 1
+
+    if has_ssim:
+        val_ssim = [item["val_ssim"] for item in history]
+        axes[next_idx].plot(epochs, val_ssim, marker="o", color="tab:purple", label="Validation SSIM")
+        axes[next_idx].set_xlabel("Epoch")
+        axes[next_idx].set_ylabel("SSIM")
+        axes[next_idx].set_title("Validation SSIM")
+        axes[next_idx].grid(True)
+
+    plt.tight_layout()
     plt.show()
