@@ -1,0 +1,40 @@
+# Byte-compiled / optimized
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+*.egg-info/
+.installed.cfg
+*.egg
+build/
+dist/
+
+# Environments
+.env
+.venv/
+env/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Model checkpoints (download from Hugging Face, do not commit)
+*.pt
+*.pth
+checkpoints/
+
+# Generated outputs
+outputs/*.png
+outputs/*.jpg
+!outputs/.gitkeep

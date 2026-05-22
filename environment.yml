@@ -314,10 +314,9 @@ dependencies:
       - nvidia-nvjitlink==13.0.88
       - nvidia-nvshmem-cu13==3.4.5
       - nvidia-nvtx==13.0.85
-      - pandas==3.0.3
       - setuptools==81.0.0
       - sympy==1.14.0
       - torch==2.11.0
       - torchvision==0.26.0
       - triton==3.6.0
-prefix: /home/adrian.martinez.balea/miniconda3/envs/cv2
+prefix: /home/adrian/.conda/envs/cv2
