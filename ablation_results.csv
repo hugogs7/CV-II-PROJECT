@@ -1,0 +1,6 @@
+Model,Test L1,Test PSNR (dB),Test SSIM
+Baseline,0.3024,14.84,0.4074
++ Augmentation,0.2969,14.73,0.3307
++ LSGAN,0.2813,15.39,0.4309
++ Multi-scale D,0.3009,14.72,0.3877
+Improved (all),0.2759,15.48,0.4278
