@@ -7,6 +7,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
+
 .venv/
 venv/
 env/
@@ -49,26 +50,57 @@ desktop.ini
 # =========================
 
 MoNuSeg/
+monuseg_dataset/
 data/
 datasets/
 
 
 # =========================
-# Model checkpoints and training outputs
+# Model checkpoints
 # =========================
-
-checkpoints/
-models/
-runs/
-outputs/
-results/
-wandb/
-lightning_logs/
 
 *.pt
 *.pth
 *.ckpt
 *.onnx
+
+checkpoints/
+**/checkpoints/
+
+
+# =========================
+# Training and experiment outputs
+# =========================
+
+runs/
+wandb/
+lightning_logs/
+results/
+**/results/
+
+
+# =========================
+# Demo samples and generated outputs
+# =========================
+
+demo/outputs/
+demo/samples/*.png
+demo/samples/*.jpg
+demo/samples/*.jpeg
+
+!demo/outputs/.gitkeep
+!demo/samples/README.md
+
+
+# =========================
+# Generic generated outputs
+# =========================
+
+outputs/
+**/outputs/
+
+*.npy
+*.npz
 
 
 # =========================
@@ -85,7 +117,16 @@ lightning_logs/
 
 
 # =========================
-# Large media files
+# Local notes and temporary files
+# =========================
+
+claude.txt
+*.tmp
+*.bak
+
+
+# =========================
+# Large archives and media files
 # =========================
 
 *.mp4
