@@ -26,15 +26,27 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Notebook checkpoints
-.ipynb_checkpoints/
-
-# Model checkpoints (download from Hugging Face, do not commit)
+# Model checkpoints
 *.pt
 *.pth
+*.ckpt
+*.onnx
 checkpoints/
+**/checkpoints/
 
 # Generated outputs
-outputs/*.png
-outputs/*.jpg
+outputs/
+**/outputs/
+results/
+**/results/
 !outputs/.gitkeep
+!**/outputs/.gitkeep
+
+# Generated notebook/report artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.bbl
+*.blg
+*.synctex.gz

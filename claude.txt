@@ -1,0 +1,519 @@
+Listo. Vamos a avanzar ahora con la Task 3
+
+May 22
+Vamos con la Tarea 3. Te confirmo los entregables según el enunciado y las anotaciones que tomaste en clase:
+
+Lo que pide el enunciado:
+
+Un programa que reciba una imagen y haga inferencia con los modelos entrenados.
+Repositorio público de GitHub con:
+Programa solo de inferencia (no entrenamiento).
+Uno o varios modelos entrenados.
+Imágenes de muestra.
+README con instrucciones.
+Anotaciones de clase importantes:
+
+Las imágenes de ejemplo deben ser del test set de vuestro dataset asignado (MoNuSeg), no externas.
+No hace falta GUI: basta con CLI con parámetros (input, modelo, output).
+Alternativa: notebook de Jupyter.
+La salida debe mostrar label / generado / real lado a lado.
+Antes de empezar, una decisión:
+
+Mientras decides, te dejo mi recomendación para cada una:
+
+Pregunta 1 — formato: yo iría con CLI + notebook que lo reutiliza. Razones:
+
+El CLI es lo que pide el enunciado de forma más estricta y es lo más "profesional" para enseñar en GitHub.
+Pero el notebook complementa muy bien porque permite enseñar visualmente los resultados sin tener que correr nada (Jupyter renderiza las imágenes inline).
+Si el notebook simplemente importa funciones del script CLI y las llama, no estás duplicando código. Es lo limpio.
+Pregunta 2 — checkpoints en el repo: Baseline + Improved-all (los dos extremos). Razones:
+
+Los checkpoints pesan ~211 MB cada uno (54M parámetros × 4 bytes). Subir los 5 = ~1 GB → excede el límite de tamaño de GitHub (que es 100 MB por archivo por defecto, y aunque se puede usar Git LFS, complica el setup del demo). Aunque, según vea el tamaño real, vemos.
+Con baseline + improved-all el usuario puede comparar el "antes" y el "después" de tus mejoras, que es lo que tiene sentido enseñar.
+Los otros 3 checkpoints (aug solo, lsgan solo, multi solo) son útiles para la ablation del informe pero no para el demo.
+Espero tu respuesta para arrancar.
+
+P: ¿Qué formato de demo prefieres?
+R: Ambos (CLI + notebook que reutiliza el código del CLI)
+
+P: ¿Qué modelos quieres incluir en el repo como checkpoints disponibles?
+R: Los 5 modelos del ablation
+
+May 22
+Perfecto. Antes de empezar, una verificación rápida del tamaño de los checkpoints, porque GitHub tiene un límite de 100 MB por archivo:
+
+
+Calcular tamaño de los checkpoints
+Calcular tamaño de los checkpoints
+Confirmado: cada checkpoint excede los 100 MB de GitHub incluso en FP16. Tienes tres opciones razonables:
+
+Mi recomendación: Hugging Face Hub. Razones:
+
+Es la opción estándar de facto en la comunidad ML para distribuir pesos. Más profesional que Google Drive.
+Gratuito y sin límite de cuota para repos públicos (a diferencia de Git LFS, que tiene cuota mensual de bandwidth).
+Permite descarga programática desde Python con huggingface_hub.hf_hub_download, perfecto para el script de demo.
+En el README ponéis el link al repo de HF y queda muy limpio.
+A los profesores y los compañeros del peer review les va a sonar.
+Git LFS también funciona pero tiene bandwidth limitado a 1 GB/mes en cuenta gratuita, y si varios profesores/revisores clonan el repo se puede agotar.
+
+Google Drive funciona pero queda menos profesional y la descarga programática de Drive es siempre un dolor de cabeza (links que cambian, captchas de "are you a robot").
+
+¿Voy con Hugging Face? Confírmame y arranco.
+
+Subirlos a Hugging Face
+
+May 22
+Perfecto. Voy a construir todo el stack del demo. Plan:
+
+Plan de Tarea 3
+Archivos a crear:
+
+demo/inference.py — biblioteca importable con la lógica de inferencia (load checkpoint, generate, save side-by-side).
+demo/demo.py — script CLI que importa de inference.py (argparse con --input, --model, --output).
+demo/demo_notebook.ipynb — notebook que importa de inference.py y enseña visualmente.
+README.md — instrucciones completas (setup, descarga de pesos desde HF, ejemplos de uso).
+requirements.txt — dependencias mínimas.
+samples/ — algunas imágenes del test set para que cualquiera pueda probar el demo (carpeta vacía con instrucciones en README, ya que las imágenes reales las pondréis vosotros).
+.gitignore — para no subir checkpoints accidentalmente, etc.
+Estructura final del repo:
+
+pix2pix-monuseg-demo/
+├── README.md
+├── requirements.txt
+├── .gitignore
+├── demo/
+│   ├── inference.py
+│   ├── demo.py
+│   └── demo_notebook.ipynb
+├── samples/
+│   ├── README.md            (instrucciones para añadir imágenes)
+│   └── (vacío — vosotros añadiréis 3-4 imágenes del test set)
+├── models.py                 (copia del proyecto, necesaria para cargar el state_dict)
+└── outputs/                  (carpeta de outputs por defecto, .gitkeep)
+Voy a empezar.
+
+
+Crear estructura del repo
+Crear estructura del repo
+1. models.py (copia, necesaria para reconstruir la arquitectura)
+
+Copiar models.py al repo demo
+Copiar models.py al repo demo
+2. demo/inference.py — biblioteca de inferencia
+
+Crear inference.py con la lógica reutilizable
+Crear inference.py con la lógica reutilizable
+3. demo/demo.py — script CLI
+
+Crear el script CLI demo.py
+Crear el script CLI demo.py
+4. demo/demo_notebook.ipynb — notebook visual
+
+Crear el notebook de demo
+Crear el notebook de demo
+5. requirements.txt
+
+Crear requirements.txt
+Crear requirements.txt
+6. .gitignore
+
+Crear .gitignore
+Crear .gitignore
+7. README de samples/ y .gitkeep para outputs/
+
+Archivo creado, ejecutó un comando
+Archivo creado, ejecutó un comando
+8. README.md principal
+
+Crear README.md principal del repo
+Crear README.md principal del repo
+9. Verificación: arrancar el demo CLI con un checkpoint dummy y ver que el flujo funciona
+
+Ejecutó 3 comandos
+Ejecutó 3 comandos
+Ahora un test end-to-end completo: creo un checkpoint dummy y una imagen paired falsa, y verifico que el flujo entero funciona:
+
+
+Smoke test end-to-end del demo CLI
+Smoke test end-to-end del demo CLI
+End-to-end funciona: el CLI carga el checkpoint local, procesa la imagen paired, separa label/real, genera, guarda la figura side-by-side. 1.5 MB de output es el PNG con las 3 imágenes.
+
+También verifico el caso de directorio (batch):
+
+
+Test modo batch del CLI
+Test modo batch del CLI
+Batch mode también funciona perfectamente.
+
+Empaquetado final del repo
+
+Ver estructura final del repo
+Ver estructura final del repo
+112 KB total. Lo presento todo:
+
+
+Copiar repo completo a outputs
+Copiar repo completo a outputs
+Limpio los __pycache__ antes de empaquetar:
+
+
+Limpiar __pycache__ y listar archivos finales
+Limpiar __pycache__ y listar archivos finales
+También creo un ZIP para que sea más cómodo descargar todo de una:
+
+
+Ejecutó un comando, leyó un archivo
+Ejecutó un comando, leyó un archivo
+Resumen de la Tarea 3
+Lo que está hecho (Tarea 3 completa a nivel de código)
+Estructura del repo (9 archivos, 112 KB):
+
+pix2pix-monuseg-demo/
+├── README.md                   ← instrucciones completas
+├── requirements.txt
+├── .gitignore
+├── models.py                   ← arquitectura U-Net (copia del proyecto)
+├── demo/
+│   ├── inference.py            ← biblioteca reutilizable
+│   ├── demo.py                 ← script CLI
+│   └── demo_notebook.ipynb     ← notebook visual
+├── samples/
+│   └── README.md
+└── outputs/
+    └── .gitkeep
+Lo que se cumple del enunciado:
+
+✅ Solo inferencia (no entrenamiento) — no hay nada de training en el repo.
+✅ Uno o varios modelos disponibles — los 5 del ablation, vía Hugging Face.
+✅ Sample images (placeholder) — vosotros añadiréis 3-4 imágenes del test set.
+✅ README con instrucciones de instalación y uso.
+Lo que se cumple de las notas de clase:
+
+✅ CLI con --input, --model, --output.
+✅ Notebook como alternativa (que reutiliza inference.py, no duplica código).
+✅ Salida side-by-side label / generated / real.
+✅ Sample images del test set.
+Lo que está testeado:
+
+✅ Imports y sintaxis.
+✅ Modo single-image: --input file.png --output out.png.
+✅ Modo batch: --input dir/ --output dir/.
+✅ Carga de checkpoints locales con --checkpoints-dir.
+✅ CPU mode (en GPU funcionará igual, solo cambia pick_device).
+✅ Generación de figuras side-by-side correctas.
+Lo que tenéis que hacer manualmente
+Hay 4 acciones que requieren cuentas/credenciales que yo no tengo:
+
+Subir checkpoints a Hugging Face Hub (los 5 .pt que están en checkpoints/ en el entorno de Hugo). Pasos:
+Crear cuenta en huggingface.co.
+Crear un repo nuevo (modelo), por ejemplo tu-usuario/pix2pix-monuseg.
+huggingface-cli login y subir los 5 archivos.
+Reemplazar REPLACE_WITH_YOUR_HF_REPO_ID en dos sitios:
+demo/inference.py línea ~36 (constante HUGGINGFACE_REPO_ID).
+README.md (en la sección "Where are the checkpoints hosted?").
+Crear el repo en GitHub y subir todo este código.
+Añadir 3-4 imágenes del test set en samples/ (no las subo yo porque no tengo el dataset; copiad cualquiera de las 75 imágenes del test split de Hugo).
+¿Quieres que te dé los comandos exactos para los pasos 1 y 3 (Hugging Face + GitHub)? Y luego avanzamos con el informe IEEE de 4 páginas, que es lo último que queda.
+
+
+Pix2pix demo repo
+ZIP 
+
+Readme
+Documento · MD 
+
+Inference
+PY 
+
+Demo
+PY 
+
+Demo notebook
+IPYNB 
+
+Requirements
+TXT 
+
+.gitignore
+GITIGNORE 
+Como puedo estructurar el directorio del proyecto completo (el notebook y la demo) para mi entrega?
+
+12:34 AM
+Buena pregunta — hay que tener cuidado porque mezclar el código de entrenamiento (lo que entregas a los profesores en Teams) con el código del demo (lo que sube a GitHub público) puede crear problemas. Te explico la lógica y te doy una estructura limpia.
+
+La regla clave
+El enunciado lo separa explícitamente:
+
+Entregable	Destino	Qué contiene
+Código del proyecto	Teams (privado)	Notebook + scripts de entrenamiento + informe
+Demo	GitHub (público)	Solo inferencia + checkpoints + samples + README
+Esto no es burocracia: el GitHub público no debería tener todo el código de entrenamiento porque (a) no es lo que pide el enunciado para el demo, (b) los compañeros del peer review podrían copiarlo, (c) el train_loader_aug y el resto no aportan nada al usuario que solo quiere probar el modelo.
+
+Por tanto lo limpio es tener DOS carpetas separadas, no una. Pero las dos pueden vivir bajo un mismo directorio "padre" en tu disco para que las tengas juntas durante el desarrollo.
+
+Estructura recomendada
+CV-II-PROJECT/                          ← tu carpeta de trabajo local
+│
+├── monuseg_dataset/                    ← dataset (NO se entrega)
+│   └── *.png
+│
+├── project/                            ← LO QUE ENTREGAS EN TEAMS
+│   ├── src/
+│   │   ├── datasets.py
+│   │   ├── models.py
+│   │   ├── training.py
+│   │   └── utils.py
+│   ├── checkpoints/                    ← generados al entrenar (no se entrega)
+│   │   ├── baseline_pix2pix_best.pt
+│   │   ├── improved_aug_best.pt
+│   │   ├── improved_lsgan_best.pt
+│   │   ├── improved_multi_best.pt
+│   │   └── improved_all_best.pt
+│   ├── Project_Hugo_Adrian.ipynb       ← notebook completo
+│   ├── ablation_results.csv            ← generado por el notebook
+│   ├── qualitative_comparison.png      ← generado por el notebook
+│   └── report.pdf                      ← el IEEE de 4 páginas
+│
+└── pix2pix-monuseg-demo/               ← LO QUE SUBES A GITHUB (público)
+    ├── README.md
+    ├── requirements.txt
+    ├── .gitignore
+    ├── models.py
+    ├── demo/
+    │   ├── inference.py
+    │   ├── demo.py
+    │   └── demo_notebook.ipynb
+    ├── samples/
+    │   ├── README.md
+    │   ├── TCGA-XX-1.png       ← 3-4 imágenes del test
+    │   └── TCGA-XX-2.png
+    └── outputs/
+        └── .gitkeep
+Qué se entrega en cada sitio
+A Teams (carpeta project/)
+Comprime project/ entero en un ZIP y sube ese ZIP. Excluyendo:
+
+❌ checkpoints/ — pesa ~3 GB con los 5 modelos, no es razonable subirlos a Teams. Mencionas en el informe que están públicos en Hugging Face.
+❌ monuseg_dataset/ — los profesores ya lo tienen, ellos os lo dieron.
+Lo que se queda dentro: el código fuente (src/), el notebook ejecutado (con outputs), los CSVs/figuras que ya genera el notebook, y el informe PDF.
+
+A GitHub (carpeta pix2pix-monuseg-demo/)
+Lo que ya tienes preparado. Subes esa carpeta tal cual como repo público. Los checkpoints viven en Hugging Face y se descargan al usar el demo. El informe IEEE lleva el link al repo de GitHub (lo pide explícitamente el enunciado: "Technical approach (include the link to the public repository)").
+
+Detalles importantes
+1. No metas el demo dentro de project/
+Sería mezclar dos cosas con propósitos distintos. Si alguien ejecuta el notebook de entrenamiento dentro de project/, no necesita nada del demo. Si alguien clona el repo de GitHub para probar el demo, no necesita el código de entrenamiento.
+
+2. models.py está duplicado (uno en project/src/, otro en demo_repo/)
+Sí, intencionalmente. Es 200 líneas y no cambia nunca. Tener el demo autocontenido (sin depender de la carpeta del proyecto) es mucho más valioso que ahorrar 200 líneas duplicadas. La alternativa (que el demo importe del proyecto) acoplaría las dos cosas innecesariamente.
+
+3. Verifica antes de entregar
+Tres cosas a comprobar antes de subir nada:
+
+El notebook se abre y enseña los outputs guardados: abre Project_Hugo_Adrian.ipynb desde Teams después de subirlo, comprueba que las gráficas y tablas se ven sin ejecutarlo.
+El ZIP es razonable: el .ipynb ya pesa ~1.4 MB por las imágenes embebidas en outputs. Con src/ y figuras debería rondar los 2-3 MB. Si pesa más, mira si has metido checkpoints/ por error.
+El repo de GitHub clona y funciona: clónalo en una carpeta limpia y prueba a correr python demo/demo.py --input samples/img.png para asegurarte de que la descarga desde HF funciona y no hay imports rotos.
+4. El informe enlaza las dos cosas
+En la sección "Technical approach" del informe IEEE pondrás algo como:
+
+"The complete training code and ablation notebook are submitted with this report. The trained models are publicly available on Hugging Face Hub at [link], and an inference-only demo (CLI + Jupyter notebook) is hosted at [link to GitHub repo]."
+
+Eso conecta los tres pedazos: el código privado (Teams), los modelos públicos (HF), y el demo público (GitHub).
+
+Resumen
+Sitio	Qué subes	Tamaño aprox.
+Teams	ZIP de project/ (sin checkpoints, sin dataset)	~3 MB
+Hugging Face	Los 5 archivos .pt	~1 GB
+GitHub	pix2pix-monuseg-demo/ tal cual	~112 KB
+Tres sitios, tres propósitos, sin solapamiento. ¿Te parece bien esta estructura o quieres ajustarla?
+
+Esta seccion de codigo en el notebook se mantendría bien?
+
+PROJECT_ROOT = Path.cwd()
+DATASET_DIR = PROJECT_ROOT / "MoNuSeg"
+
+12:38 AM
+Buena pillada. Esa línea ya no encaja con la estructura nueva que te propuse, porque ahora el dataset vive fuera de project/, no dentro. Vamos a verlo.
+
+El problema
+Con la nueva estructura:
+
+CV-II-PROJECT/
+├── monuseg_dataset/         ← el dataset está aquí
+└── project/
+    ├── Project_Hugo_Adrian.ipynb
+    └── src/
+Cuando ejecutas el notebook desde project/, Path.cwd() te da .../CV-II-PROJECT/project/. Por tanto Path.cwd() / "MoNuSeg" busca el dataset en .../CV-II-PROJECT/project/MoNuSeg/ — que no existe.
+
+La solución limpia
+Cambiar DATASET_DIR para que suba un nivel y busque al lado de project/:
+
+python
+PROJECT_ROOT = Path.cwd()
+DATASET_DIR = PROJECT_ROOT.parent / "monuseg_dataset"
+Esto asume la estructura que te propuse. Si Hugo prefiere tener el dataset en otro sitio (por ejemplo dentro de project/ para mantener la convención original), se ajusta a lo que tengáis.
+
+Mi recomendación: hacerlo configurable
+En lugar de hard-codearlo, lo más flexible es usar una variable de entorno con un valor por defecto sensato:
+
+python
+import os
+from pathlib import Path
+
+PROJECT_ROOT = Path.cwd()
+
+# Allow overriding the dataset location via an environment variable.
+# Default: assume the dataset lives next to this project folder, in
+# ../monuseg_dataset/ relative to the notebook.
+DATASET_DIR = Path(
+    os.environ.get("MONUSEG_DATASET_DIR", PROJECT_ROOT.parent / "monuseg_dataset")
+)
+
+if not DATASET_DIR.exists():
+    raise FileNotFoundError(
+        f"Dataset not found at {DATASET_DIR}. "
+        f"Either place the MoNuSeg images there, or set the MONUSEG_DATASET_DIR "
+        f"environment variable to the correct path."
+    )
+
+print(f"Project root: {PROJECT_ROOT}")
+print(f"Dataset dir:  {DATASET_DIR}")
+Ventajas:
+
+Funciona "out of the box" si seguís la estructura recomendada.
+Hugo puede ejecutarlo con su layout actual sin tocar nada haciendo export MONUSEG_DATASET_DIR=/ruta/que/sea antes de lanzar Jupyter.
+Da un mensaje de error claro si la ruta no existe, en lugar de un críptico RuntimeError: No images with extension *.png were found desde utils.py.
+Los profesores que evalúen el notebook ven inmediatamente dónde poner el dataset.
+Una cosa más
+Mientras estás en esto, fíjate también en la línea de los checkpoints:
+
+python
+CHECKPOINT_DIR = PROJECT_ROOT / "checkpoints"
+Esta sí está bien con la estructura nueva (los checkpoints viven dentro de project/checkpoints/). No hay que tocarla.
+
+¿Quieres que te aplique el cambio al notebook?
+
+Como pruebo la demo?
+
+12:47 AM
+Buena pregunta. Voy a darte los pasos exactos. Hay dos formas de probarla, según en qué fase estés.
+
+Forma 1: Probarla antes de subir nada (recomendado para verificar primero)
+Usas los checkpoints que ya tienes en project/checkpoints/ directamente, sin pasar por Hugging Face. Esto te permite saber que el código funciona antes de gastar tiempo subiendo cosas.
+
+Pasos
+1. Copia 3-4 imágenes del test set a samples/. No sabes cuáles son las del test exactamente porque el split se hace dinámicamente con seed=42, pero puedes ejecutar este snippet en el notebook para sacarlas:
+
+python
+# Ejecuta esta celda en el notebook de entrenamiento, despues de que test_paths este definido
+import shutil
+from pathlib import Path
+
+demo_samples_dir = Path("../pix2pix-monuseg-demo/samples")  # ajusta a tu ruta
+demo_samples_dir.mkdir(parents=True, exist_ok=True)
+
+for path in test_paths[:4]:
+    shutil.copy(path, demo_samples_dir / path.name)
+    print(f"Copied: {path.name}")
+2. Abre una terminal en la carpeta del repo del demo:
+
+bash
+cd /ruta/a/pix2pix-monuseg-demo
+3. Instala dependencias (si no las tienes ya en el entorno de Hugo):
+
+bash
+pip install -r requirements.txt
+4. Ejecuta el CLI apuntando a los checkpoints locales (sin descarga desde HF):
+
+bash
+python demo/demo.py \
+    --input samples/ \
+    --model improved \
+    --output outputs/ \
+    --checkpoints-dir ../project/checkpoints
+Ajusta ../project/checkpoints a la ruta real donde tengáis los .pt. Por la estructura que te propuse, esa ruta relativa debería ser correcta.
+
+5. Mira el resultado:
+
+bash
+ls outputs/
+Deberías ver nombre_test_demo.png por cada imagen del input. Ábrelas y verás la figura label / generated / real.
+
+6. Prueba con los otros modelos para comprobar que todos cargan:
+
+bash
+python demo/demo.py --input samples/img1.png --model baseline --output outputs/r_baseline.png --checkpoints-dir ../project/checkpoints
+python demo/demo.py --input samples/img1.png --model lsgan --output outputs/r_lsgan.png --checkpoints-dir ../project/checkpoints
+# etc.
+7. Prueba también el notebook:
+
+bash
+jupyter notebook demo/demo_notebook.ipynb
+Y ejecuta las celdas en orden. Como en este notebook hay un resolve_checkpoint_path(MODEL_NAME) que va a Hugging Face por defecto, para esta prueba local necesitas pasarle un local_checkpoints_dir. Modifica temporalmente la celda 3:
+
+python
+checkpoint_path = resolve_checkpoint_path(
+    MODEL_NAME,
+    local_checkpoints_dir=Path("../project/checkpoints"),
+)
+Al subirlo a GitHub luego revertir ese cambio.
+
+Forma 2: Probarla simulando el flujo del usuario final (después de subir a HF y GitHub)
+Esto es lo que harán los profesores y peer review. Tú lo simulas borrando todo y partiendo de cero como si fueras un usuario externo.
+
+Pasos
+1. Sube los checkpoints a Hugging Face Hub:
+
+bash
+pip install huggingface_hub
+huggingface-cli login  # te pide un access token, que sacas de https://huggingface.co/settings/tokens
+
+# Crea el repo (una sola vez)
+huggingface-cli repo create pix2pix-monuseg --type model
+
+# Sube los 5 ficheros
+cd /ruta/a/project/checkpoints
+huggingface-cli upload tu_usuario/pix2pix-monuseg baseline_pix2pix_best.pt
+huggingface-cli upload tu_usuario/pix2pix-monuseg improved_aug_best.pt
+huggingface-cli upload tu_usuario/pix2pix-monuseg improved_lsgan_best.pt
+huggingface-cli upload tu_usuario/pix2pix-monuseg improved_multi_best.pt
+huggingface-cli upload tu_usuario/pix2pix-monuseg improved_all_best.pt
+2. Edita demo/inference.py y README.md para reemplazar REPLACE_WITH_YOUR_HF_REPO_ID por tu_usuario/pix2pix-monuseg.
+
+3. Clona el repo en una carpeta nueva (simulando a un usuario que parte de cero):
+
+bash
+cd /tmp
+git clone https://github.com/tu_usuario/pix2pix-monuseg-demo.git
+cd pix2pix-monuseg-demo
+4. Crea un entorno virtual limpio (importante: así verificas que requirements.txt está completo y no falta nada):
+
+bash
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+# o .venv\Scripts\activate  en Windows
+pip install -r requirements.txt
+5. Ejecuta el demo sin --checkpoints-dir (así fuerza la descarga desde HF):
+
+bash
+python demo/demo.py --input samples/sample_01.png
+La primera vez tarda ~30s descargando el checkpoint (200 MB). Las siguientes es instantáneo porque queda cacheado en ~/.cache/huggingface/.
+
+6. Verifica el output:
+
+bash
+ls outputs/
+Lo mínimo que recomiendo verificar
+Independientemente de qué forma uses:
+
+Test	Cómo
+✅ El CLI da --help sin errores	python demo/demo.py --help
+✅ Procesa una sola imagen	python demo/demo.py --input samples/X.png
+✅ Procesa una carpeta entera	python demo/demo.py --input samples/
+✅ Carga los 5 modelos sin error	iterar con --model baseline/aug/lsgan/multi/improved
+✅ El notebook se ejecuta de principio a fin	abrir y "Run All"
+Mi sugerencia concreta
+Empieza por la Forma 1. Antes de subir nada a HF/GitHub (que son cambios "irreversibles" en cierto modo — puedes borrar pero ya queda en historial), verifica que el código funciona. Si todo va bien, luego pasas a la Forma 2 con tranquilidad.
+
+¿Quieres que te dé los comandos exactos para subir a Hugging Face cuando llegue el momento, o avanzamos ya con el informe IEEE?
+
