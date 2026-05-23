@@ -84,6 +84,7 @@ results/
 # =========================
 
 demo/outputs/
+demo/outputs_*/
 demo/samples/*.png
 demo/samples/*.jpg
 demo/samples/*.jpeg

@@ -40,7 +40,7 @@ from models import UNetGenerator  # noqa: E402
 # Maps each model name (used in --model) to its checkpoint filename on
 # Hugging Face Hub. The first listed model is the default.
 
-HUGGINGFACE_REPO_ID = "REPLACE_WITH_YOUR_HF_REPO_ID"  # e.g. "username/pix2pix-monuseg"
+HUGGINGFACE_REPO_ID = "hugogs-7/pix2pix-monuseg"
 
 AVAILABLE_MODELS = {
     "baseline": "baseline_pix2pix_best.pt",
