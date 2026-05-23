@@ -334,6 +334,25 @@ def load_generator_weights(
     return generator
 
 
+def load_history_from_checkpoint(
+    checkpoint_path: Path,
+    device: torch.device | None = None,
+) -> list[dict]:
+    """
+    Load the training history (list of per-epoch metric dicts) from a Pix2Pix
+    checkpoint.
+
+    Used together with load_generator_weights to skip retraining when a
+    checkpoint already exists: we restore both the weights (for evaluation and
+    qualitative inspection) and the history (for plotting the loss curves
+    without having to retrain).
+    """
+    if device is None:
+        device = torch.device("cpu")
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    return checkpoint.get("history", [])
+
+
 @torch.no_grad()
 def evaluate_on_test_set(
     generator: nn.Module,
