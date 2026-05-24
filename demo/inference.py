@@ -25,10 +25,10 @@ import torchvision.transforms.functional as TF
 from PIL import Image
 from torchvision.transforms import InterpolationMode
 
-# Make the project root importable so we can find models.py (one directory up).
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
+# Make models.py importable. It lives in the same directory as this file.
+_THIS_DIR = Path(__file__).resolve().parent
+if str(_THIS_DIR) not in sys.path:
+    sys.path.insert(0, str(_THIS_DIR))
 
 from models import UNetGenerator  # noqa: E402
 
